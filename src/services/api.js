@@ -1,8 +1,9 @@
 import axios from "axios";
 
 const api = axios.create({
-    baseURL: "http://192.168.5.242:3333/",
+    // baseURL: "http://192.168.5.242:3333/",
     // baseURL: "https://api.passebem.co.mz/",
+    baseURL: "https://pass-bem-api-neo.vercel.app/",
     timeout: 15000, // 15 segundos timeout
     headers: {
         'Content-Type': 'application/json',
