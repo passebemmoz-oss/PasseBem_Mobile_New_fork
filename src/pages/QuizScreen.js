@@ -67,33 +67,49 @@ function QuizScreen({navigation}) {
     const [descricao, setdescricao] = useState('')
 
     const [isLoading, setLoading] = useState(false)
+    const [quizStarted, setQuizStarted] = useState(false) // Controla quando o timer deve começar
 
-    // Contador customizado
-    useEffect(() => {
-        if (timeLeft > 0 && ativetest) {
-            timerRef.current = setTimeout(() => {
-                setTimeLeft(timeLeft - 1);
-            }, 1000);
-        } else if (timeLeft === 0) {
-            // Tempo esgotado
-            Alert.alert("Tempo esgotado!", "O teste foi finalizado automaticamente.");
-            GravarProva();
-        }
-
-        return () => {
-            if (timerRef.current) {
-                clearTimeout(timerRef.current);
-            }
-        };
-    }, [timeLeft, ativetest]);
-
+    // Função para formatar o tempo
     const formatTime = (seconds) => {
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     };
 
+    // Contador customizado - Usa setInterval para garantir execução contínua
+    useEffect(() => {
+        if (!quizStarted || quiz.length === 0) {
+            console.log('⏸️ TIMER NÃO INICIADO - quizStarted:', quizStarted, 'quiz.length:', quiz.length);
+            return;
+        }
+
+        console.log('⏱️ INICIANDO INTERVAL - timeLeft:', timeLeft);
+
+        const intervalId = setInterval(() => {
+            setTimeLeft((prevTime) => {
+                const newTime = prevTime - 1;
+                console.log('⏱️ TIMER CONTANDO:', formatTime(newTime), '(', newTime, 'segundos)');
+                
+                if (newTime <= 0) {
+                    console.log('⏰ TEMPO ESGOTADO!');
+                    clearInterval(intervalId);
+                    Alert.alert("Tempo esgotado!", "O teste foi finalizado automaticamente.");
+                    GravarProva();
+                    return 0;
+                }
+                
+                return newTime;
+            });
+        }, 1000);
+
+        return () => {
+            console.log('🧹 LIMPANDO INTERVAL');
+            clearInterval(intervalId);
+        };
+    }, [quizStarted, quiz.length]); // Removido timeLeft das dependências
+
     function Clear(){
+        console.log('🧹 CLEAR CHAMADO');
         setQuiz([])
         setNumber(0)
         setquizprogress(0)
@@ -102,9 +118,7 @@ function QuizScreen({navigation}) {
         setuserOption("")
         setactivecolor('#f0f4fd')
         setTimeLeft(1800)
-        if (timerRef.current) {
-            clearTimeout(timerRef.current);
-        }
+        setQuizStarted(false) // Isso vai parar o interval
     }
 
     const backAction = () => {
@@ -137,6 +151,7 @@ function QuizScreen({navigation}) {
     }, [emfalta]);
 
     function AtivTestF(){
+        console.log('🎯 ATIVTESTF CHAMADO - quizStarted:', quizStarted);
 
         const perct = Math.round((number * 100) / 25)
         const pertual = Math.round(perct) / 100 // Usar valores inteiros
@@ -167,7 +182,7 @@ function QuizScreen({navigation}) {
     }
 
     function NextQuetion(){
-        console.log('➡️ AVANÇANDO PARA PRÓXIMA QUESTÃO (QUIZ)');
+        console.log('➡️ AVANÇANDO PARA PRÓXIMA QUESTÃO (QUIZ) - quizStarted:', quizStarted);
         console.log('📍 QUESTÃO ATUAL (QUIZ):', number + 1);
         console.log('🖼️ IMAGE_URL ATUAL (QUIZ):', quiz[number]?.image_url);
         console.log('📝 RESPOSTA ATUAL (QUIZ):', userOption);
@@ -191,6 +206,8 @@ function QuizScreen({navigation}) {
             setNumber(number +1)
             setativetest(false)
         }
+        
+        console.log('✅ NextQuetion COMPLETO - quizStarted ainda:', quizStarted);
     }
 
     useEffect(() => {
@@ -228,6 +245,10 @@ function QuizScreen({navigation}) {
                     setProva(res.data.prova)
                     
                     console.log('✅ QUIZ CARREGADO COM', res.data.results.length, 'questões');
+                    
+                    // Iniciar o timer
+                    setQuizStarted(true);
+                    console.log('⏱️ TIMER INICIADO');
                 })
                 .catch(err => console.error('❌ ERRO AO CARREGAR QUESTÕES:', err))
         }
