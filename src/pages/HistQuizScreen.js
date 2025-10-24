@@ -11,6 +11,37 @@ import api from "../services/api"
 
 const { height, width} = Dimensions.get("screen")
 
+// Função para converter URL das imagens
+const convertImageUrl = (url) => {
+    if (!url) return url;
+    
+    // Se a URL já está no formato GitHub, retorna como está
+    if (url.includes('raw.githubusercontent.com/Euler-JS/passebem_uploads')) {
+        return url;
+    }
+    
+    // Se contém a URL antiga da API, substitui pela nova do GitHub
+    if (url.includes('https://api.passebem.co.mz/files/')) {
+        const fileName = url.replace('https://api.passebem.co.mz/files/', '');
+        const newUrl = `https://raw.githubusercontent.com/Euler-JS/passebem_uploads/main/uploads/${fileName}`;
+        console.log('🔄 CONVERTENDO URL DA IMAGEM (HISTÓRICO):');
+        console.log('📥 URL ANTIGA:', url);
+        console.log('📤 URL NOVA:', newUrl);
+        return newUrl;
+    }
+    
+    // Se não tem a base da API, assume que é só o nome do arquivo
+    if (!url.startsWith('http')) {
+        const newUrl = `https://raw.githubusercontent.com/Euler-JS/passebem_uploads/main/uploads/${url}`;
+        console.log('🔄 ADICIONANDO BASE URL GITHUB (HISTÓRICO):');
+        console.log('📥 FILENAME:', url);
+        console.log('📤 URL COMPLETA:', newUrl);
+        return newUrl;
+    }
+    
+    return url;
+};
+
 function HistQuizScreen({navigation}) {
 
     const Route = useRoute();
@@ -106,9 +137,19 @@ function HistQuizScreen({navigation}) {
     }
 
     function NextQuetion(){
+        console.log('➡️ AVANÇANDO PARA PRÓXIMA QUESTÃO');
+        console.log('📍 QUESTÃO ATUAL:', number);
+        console.log('🖼️ IMAGE_URL ATUAL:', quiz[number]?.image_url);
+        console.log('📝 RESPOSTA ATUAL:', userOption);
 
         if(number <= 24){
-            setuserOption(quiz[number+1].resposta)
+            const proximaQuestao = number + 1;
+            if(quiz[proximaQuestao]) {
+                console.log('🔄 PRÓXIMA QUESTÃO:', proximaQuestao);
+                console.log('🖼️ PRÓXIMA IMAGE_URL:', quiz[proximaQuestao]?.image_url);
+                console.log('📝 PRÓXIMA RESPOSTA:', quiz[proximaQuestao]?.resposta);
+                setuserOption(quiz[proximaQuestao].resposta)
+            }
         }
 
         //setactivecolor("#f0f4fd")
@@ -124,30 +165,53 @@ function HistQuizScreen({navigation}) {
     }
 
     useEffect(() => {
+        console.log('🚀 INICIANDO CARREGAMENTO DO HISTÓRICO DO QUIZ');
+        console.log('📋 ITEM RECEBIDO:', item);
+        console.log('🏷️ TIPO:', tipo);
 
         api.get(`respstaprova/${item._id}`,{item})
             .then(res => {
+                console.log('📊 DADOS COMPLETOS DA API:', res.data);
+                console.log('📝 RESPOSTAS RECEBIDAS:', res.data.resposta);
                 
-                setQuiz(res.data.resposta.map((item , index)=> (
-                    {
+                setQuiz(res.data.resposta.map((item , index)=> {
+                    const convertedImageUrl = convertImageUrl(item.questao.imagem_url);
+                    
+                    console.log(`🔍 QUESTÃO ${index + 1} (HISTÓRICO):`, {
+                        questao: item.questao.questao,
+                        image_url_original: item.questao.imagem_url,
+                        image_url_convertida: convertedImageUrl,
+                        resposta_usuario: item.resposta,
+                        resposta_correta: item.questao.alternativa_correta
+                    });
+                    
+                    return {
                         question: item.questao.questao,
                         options: shuffle([...item.questao.incorecta_alternativas, item.questao.alternativa_correta]),
                         answer: item.questao.alternativa_correta,
-                        image_url:item.questao.imagem_url,
+                        image_url: convertedImageUrl,
                         resposta: item.resposta,
-                        
                     }
-                )));
+                }));
                 setuserOption(res.data.resposta[0].resposta)
                 setPts(res.data.resposta[0].prova.resultado)
-      
                 
-      
+                console.log('✅ QUIZ CARREGADO COM', res.data.resposta.length, 'questões');
             })
-            .catch(err => console.error(err))
+            .catch(err => console.error('❌ ERRO AO CARREGAR DADOS:', err))
             
-      
       }, []);
+
+    // Monitorar mudanças na questão atual
+    useEffect(() => {
+        if(quiz.length > 0 && quiz[number]) {
+            console.log('🔄 QUESTÃO MUDOU PARA:', number + 1);
+            console.log('🖼️ IMAGE_URL DA QUESTÃO ATUAL:', quiz[number].image_url);
+            console.log('❓ PERGUNTA:', quiz[number].question);
+            console.log('✅ RESPOSTA CORRETA:', quiz[number].answer);
+            console.log('👤 RESPOSTA DO USUÁRIO:', quiz[number].resposta);
+        }
+    }, [number, quiz]);
 
     const shuffle = (arr) => arr.sort();
 
@@ -209,7 +273,8 @@ function HistQuizScreen({navigation}) {
             <View style={{ width:width*0.9, alignSelf:"center", marginTop:height*0}}>
                 <View style={{ elevation:2,borderRadius:5, width:width*0.9,  backgroundColor:"#fff", alignSelf:"center", marginTop:height*0.02}}>
                     <Image style={{width:width*0.9, height:height*0.21,borderTopLeftRadius:5, borderTopRightRadius:5, resizeMode:"stretch"}} source={{uri:quiz[number].image_url}} />
-                    {console.log("imagem :",quiz[number].image_url )}
+                    {console.log(`🖼️ RENDERIZANDO IMAGEM - Questão ${number + 1}:`, quiz[number].image_url)}
+                    {console.log(`📊 ESTADO COMPLETO DA QUESTÃO ${number + 1}:`, quiz[number])}
                     <Text style={{fontWeight:"700", color:"#607d8b", textAlign:"center", marginVertical:height*0.003}}>{`${quiz[number].question}`}</Text>
                 </View>
                 

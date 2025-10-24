@@ -10,6 +10,37 @@ import api from "../services/api"
 
 const { height, width} = Dimensions.get("screen")
 
+// Função para converter URL das imagens
+const convertImageUrl = (url) => {
+    if (!url) return url;
+    
+    // Se a URL já está no formato GitHub, retorna como está
+    if (url.includes('raw.githubusercontent.com/Euler-JS/passebem_uploads')) {
+        return url;
+    }
+    
+    // Se contém a URL antiga da API, substitui pela nova do GitHub
+    if (url.includes('https://api.passebem.co.mz/files/')) {
+        const fileName = url.replace('https://api.passebem.co.mz/files/', '');
+        const newUrl = `https://raw.githubusercontent.com/Euler-JS/passebem_uploads/main/uploads/${fileName}`;
+        console.log('🔄 CONVERTENDO URL DA IMAGEM (MODULAR):');
+        console.log('📥 URL ANTIGA:', url);
+        console.log('📤 URL NOVA:', newUrl);
+        return newUrl;
+    }
+    
+    // Se não tem a base da API, assume que é só o nome do arquivo
+    if (!url.startsWith('http')) {
+        const newUrl = `https://raw.githubusercontent.com/Euler-JS/passebem_uploads/main/uploads/${url}`;
+        console.log('🔄 ADICIONANDO BASE URL GITHUB (MODULAR):');
+        console.log('📥 FILENAME:', url);
+        console.log('📤 URL COMPLETA:', newUrl);
+        return newUrl;
+    }
+    
+    return url;
+};
+
 function QuizScreen({navigation}) {
 
 
@@ -133,15 +164,25 @@ function QuizScreen({navigation}) {
         if(IsFocused){
             setdescricao(modulo.descricao)
 
-            setQuiz(perguntas.map(item => (
-                {
+            setQuiz(perguntas.map((item, index) => {
+                const convertedImageUrl = convertImageUrl(item.imagem_url);
+                
+                console.log(`🔍 QUESTÃO ${index + 1} (MODULAR):`, {
+                    questao: item.questao,
+                    image_url_original: item.imagem_url,
+                    image_url_convertida: convertedImageUrl,
+                    alternativa_correta: item.alternativa_correta,
+                    id: item._id
+                });
+                
+                return {
                     question: item.questao,
                     options: shuffle([...item.incorecta_alternativas, item.alternativa_correta]),
                     answer: item.alternativa_correta,
-                    image_url:item.imagem_url,
+                    image_url: convertedImageUrl,
                     id: item._id,
                 }
-            )));
+            }));
             
     
         }

@@ -11,6 +11,37 @@ import api from "../services/api"
 
 const { height, width} = Dimensions.get("screen")
 
+// Função para converter URL das imagens
+const convertImageUrl = (url) => {
+    if (!url) return url;
+    
+    // Se a URL já está no formato GitHub, retorna como está
+    if (url.includes('raw.githubusercontent.com/Euler-JS/passebem_uploads')) {
+        return url;
+    }
+    
+    // Se contém a URL antiga da API, substitui pela nova do GitHub
+    if (url.includes('https://api.passebem.co.mz/files/')) {
+        const fileName = url.replace('https://api.passebem.co.mz/files/', '');
+        const newUrl = `https://raw.githubusercontent.com/Euler-JS/passebem_uploads/main/uploads/${fileName}`;
+        console.log('🔄 CONVERTENDO URL DA IMAGEM:');
+        console.log('📥 URL ANTIGA:', url);
+        console.log('📤 URL NOVA:', newUrl);
+        return newUrl;
+    }
+    
+    // Se não tem a base da API, assume que é só o nome do arquivo
+    if (!url.startsWith('http')) {
+        const newUrl = `https://raw.githubusercontent.com/Euler-JS/passebem_uploads/main/uploads/${url}`;
+        console.log('🔄 ADICIONANDO BASE URL GITHUB:');
+        console.log('📥 FILENAME:', url);
+        console.log('📤 URL COMPLETA:', newUrl);
+        return newUrl;
+    }
+    
+    return url;
+};
+
 function QuizScreen({navigation}) {
 
 
@@ -36,33 +67,49 @@ function QuizScreen({navigation}) {
     const [descricao, setdescricao] = useState('')
 
     const [isLoading, setLoading] = useState(false)
+    const [quizStarted, setQuizStarted] = useState(false) // Controla quando o timer deve começar
 
-    // Contador customizado
-    useEffect(() => {
-        if (timeLeft > 0 && ativetest) {
-            timerRef.current = setTimeout(() => {
-                setTimeLeft(timeLeft - 1);
-            }, 1000);
-        } else if (timeLeft === 0) {
-            // Tempo esgotado
-            Alert.alert("Tempo esgotado!", "O teste foi finalizado automaticamente.");
-            GravarProva();
-        }
-
-        return () => {
-            if (timerRef.current) {
-                clearTimeout(timerRef.current);
-            }
-        };
-    }, [timeLeft, ativetest]);
-
+    // Função para formatar o tempo
     const formatTime = (seconds) => {
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     };
 
+    // Contador customizado - Usa setInterval para garantir execução contínua
+    useEffect(() => {
+        if (!quizStarted || quiz.length === 0) {
+            console.log('⏸️ TIMER NÃO INICIADO - quizStarted:', quizStarted, 'quiz.length:', quiz.length);
+            return;
+        }
+
+        console.log('⏱️ INICIANDO INTERVAL - timeLeft:', timeLeft);
+
+        const intervalId = setInterval(() => {
+            setTimeLeft((prevTime) => {
+                const newTime = prevTime - 1;
+                console.log('⏱️ TIMER CONTANDO:', formatTime(newTime), '(', newTime, 'segundos)');
+                
+                if (newTime <= 0) {
+                    console.log('⏰ TEMPO ESGOTADO!');
+                    clearInterval(intervalId);
+                    Alert.alert("Tempo esgotado!", "O teste foi finalizado automaticamente.");
+                    GravarProva();
+                    return 0;
+                }
+                
+                return newTime;
+            });
+        }, 1000);
+
+        return () => {
+            console.log('🧹 LIMPANDO INTERVAL');
+            clearInterval(intervalId);
+        };
+    }, [quizStarted, quiz.length]); // Removido timeLeft das dependências
+
     function Clear(){
+        console.log('🧹 CLEAR CHAMADO');
         setQuiz([])
         setNumber(0)
         setquizprogress(0)
@@ -71,9 +118,7 @@ function QuizScreen({navigation}) {
         setuserOption("")
         setactivecolor('#f0f4fd')
         setTimeLeft(1800)
-        if (timerRef.current) {
-            clearTimeout(timerRef.current);
-        }
+        setQuizStarted(false) // Isso vai parar o interval
     }
 
     const backAction = () => {
@@ -106,6 +151,7 @@ function QuizScreen({navigation}) {
     }, [emfalta]);
 
     function AtivTestF(){
+        console.log('🎯 ATIVTESTF CHAMADO - quizStarted:', quizStarted);
 
         const perct = Math.round((number * 100) / 25)
         const pertual = Math.round(perct) / 100 // Usar valores inteiros
@@ -136,6 +182,10 @@ function QuizScreen({navigation}) {
     }
 
     function NextQuetion(){
+        console.log('➡️ AVANÇANDO PARA PRÓXIMA QUESTÃO (QUIZ) - quizStarted:', quizStarted);
+        console.log('📍 QUESTÃO ATUAL (QUIZ):', number + 1);
+        console.log('🖼️ IMAGE_URL ATUAL (QUIZ):', quiz[number]?.image_url);
+        console.log('📝 RESPOSTA ATUAL (QUIZ):', userOption);
 
         const data = {
             prova: String(prova._id || prova.id || ''), 
@@ -150,34 +200,71 @@ function QuizScreen({navigation}) {
         setactivecolor("#f0f4fd")
         
         if(number < quiz.length-1){
+            const proximaQuestao = number + 1;
+            console.log('🔄 PRÓXIMA QUESTÃO (QUIZ):', proximaQuestao);
+            console.log('🖼️ PRÓXIMA IMAGE_URL (QUIZ):', quiz[proximaQuestao]?.image_url);
             setNumber(number +1)
             setativetest(false)
         }
+        
+        console.log('✅ NextQuetion COMPLETO - quizStarted ainda:', quizStarted);
     }
 
     useEffect(() => {
 
         if(IsFocused){
             setdescricao(item.descricao)
+            console.log('🚀 INICIANDO QUIZ NORMAL');
+            console.log('📋 ITEM RECEBIDO:', item);
+            console.log('🏷️ TIPO:', tipo);
 
             api.post('apptemas',{item, tipo})
                 .then(res => {
-                    setQuiz(res.data.results.map(item => (
-                        {
+                    console.log('📊 DADOS COMPLETOS DA API (QUIZ):', res.data);
+                    console.log('📝 QUESTÕES RECEBIDAS:', res.data.results);
+                    
+                    setQuiz(res.data.results.map((item, index) => {
+                        const convertedImageUrl = convertImageUrl(item.imagem_url);
+                        
+                        console.log(`🔍 QUESTÃO ${index + 1} (QUIZ):`, {
+                            questao: item.questao,
+                            image_url_original: item.imagem_url,
+                            image_url_convertida: convertedImageUrl,
+                            alternativa_correta: item.alternativa_correta,
+                            id: item._id || item.id
+                        });
+                        
+                        return {
                             question: item.questao,
                             options: shuffle([...item.incorecta_alternativas, item.alternativa_correta]),
                             answer: item.alternativa_correta,
-                            image_url:item.imagem_url,
+                            image_url: convertedImageUrl,
                             id: String(item._id || item.id || Math.random().toString()),
                         }
-                    )));
+                    }));
                     setProva(res.data.prova)
-    
+                    
+                    console.log('✅ QUIZ CARREGADO COM', res.data.results.length, 'questões');
+                    
+                    // Iniciar o timer
+                    setQuizStarted(true);
+                    console.log('⏱️ TIMER INICIADO');
                 })
-                .catch(err => console.error(err))
+                .catch(err => console.error('❌ ERRO AO CARREGAR QUESTÕES:', err))
         }
 
     }, [IsFocused]);
+
+    // Monitorar mudanças na questão atual do Quiz
+    useEffect(() => {
+        if(quiz.length > 0 && quiz[number]) {
+            console.log('🔄 QUESTÃO MUDOU PARA (QUIZ):', number + 1);
+            console.log('🖼️ IMAGE_URL DA QUESTÃO ATUAL (QUIZ):', quiz[number].image_url);
+            console.log('❓ PERGUNTA (QUIZ):', quiz[number].question);
+            console.log('✅ RESPOSTA CORRETA (QUIZ):', quiz[number].answer);
+            console.log('🆔 ID DA QUESTÃO (QUIZ):', quiz[number].id);
+        }
+    }, [number, quiz]);
 
     const shuffle = (arr) => arr.sort();
 
@@ -304,6 +391,8 @@ function QuizScreen({navigation}) {
             <View style={{ width:width*0.9, alignSelf:"center", marginTop:height*0}}>
                 <View style={{ elevation:2,borderRadius:5, width:width*0.9,  backgroundColor:"#fff", alignSelf:"center", marginTop:height*0.02}}>
                     <Image style={{width:width*0.9, height:height*0.21,borderTopLeftRadius:5, borderTopRightRadius:5, resizeMode:"stretch"}} source={{uri:quiz[number].image_url}} />
+                    {console.log(`🖼️ RENDERIZANDO IMAGEM (QUIZ) - Questão ${number + 1}:`, quiz[number].image_url)}
+                    {console.log(`📊 ESTADO COMPLETO DA QUESTÃO ${number + 1} (QUIZ):`, quiz[number])}
                     <Text style={{fontWeight:"700", color:"#607d8b", textAlign:"center", marginVertical:height*0.003}}>{`${quiz[number].question}`}</Text>
                     <TouchableOpacity
                         onPress={() => {Alert.alert(
